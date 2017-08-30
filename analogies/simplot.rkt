@@ -349,7 +349,7 @@
         (set! height new-height))
       (send this refresh))))
 
-(define (demo)
+(define (simplot-demo)
   (define frame (new frame% [label "Testing simplot"]))
   (define panel (new vertical-panel%
                      [parent frame]
