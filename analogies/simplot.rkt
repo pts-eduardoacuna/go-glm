@@ -6,17 +6,55 @@
 (require plot)
 
 (provide simplot%
-         demo)
+         simplot-demo)
+
+(define black        (make-object color% 0 0 0))
+(define dimmed-grey  (make-object color% 0 0 0 0.1))
+(define green        (make-object color% 0 255 0))
+(define dimmed-green (make-object color% 0 255 0 0.5))
+(define papaya       (make-object color% 255 239 213))
+(define crimson      (make-object color% 220 20 60))
+(define sea-green    (make-object color% 32 178 170))
+(define peach-puff   (make-object color% 255 218 185))
+(define steele-blue  (make-object color% 70 130 180))
 
 (define font       (make-object font% 8 'modern))
 (define brush      (new brush% (style 'transparent)))
 (define line-pen   (new pen% (width 1)))
-(define light-grey (make-object color% 0 0 0 0.05))
-(define grid-pen   (new pen% (width 0) (style 'dot) (color light-grey)))
+(define grid-pen   (new pen% (width 0) (style 'dot) (color dimmed-grey)))
 (define dot-pen    (new pen% (width 5)))
+(define background #f)
+(define text       black)
 
+(define (apply-regular-theme!)
+  (set! background #f)
+  (set! text       black)
+  (set! line-pen   (new pen% (width 1) (style 'solid) (color black)))
+  (set! grid-pen   (new pen% (width 0) (style 'dot)   (color dimmed-grey)))
+  (set! dot-pen    (new pen% (width 5) (style 'solid) (color black))))
 
-(define tks (linear-ticks #:number 2 #:divisors '(1 2)))
+(define (apply-console-theme!)
+  (set! background black)
+  (set! text       green)
+  (set! line-pen   (new pen% (width 1) (style 'solid) (color green)))
+  (set! grid-pen   (new pen% (width 0) (style 'dot)   (color dimmed-green)))
+  (set! dot-pen    (new pen% (width 5) (style 'solid) (color green))))
+
+(define (apply-colorful-theme!)
+  (set! background papaya)
+  (set! text       crimson)
+  (set! line-pen   (new pen% (width 1) (style 'solid) (color sea-green)))
+  (set! grid-pen   (new pen% (width 0) (style 'dot)   (color peach-puff)))
+  (set! dot-pen    (new pen% (width 5) (style 'solid) (color steele-blue))))
+
+;; (apply-regular-theme!)
+;; (apply-console-theme!)
+(apply-colorful-theme!)
+
+(define tks
+  ;; Uncomment next line and comment the one that follows it for better performance
+  ;; (linear-ticks #:number 2 #:divisors '(1 2))
+  (linear-ticks))
 
 (define (make-ticks lo hi)
   (map (lambda (t)
@@ -26,19 +64,25 @@
 (define simplot%
   (class canvas%
     (init-field parent
-                source-data
+                (source-points   #f)
+                (source-function #f)
                 (x-min -1)
                 (x-max +1)
                 (y-min -1)
                 (y-max +1)
                 (samples 20)
-                (antialiasing? #t))
+                (antialiasing? #t)
+                (grid? #t)
+                (ticks? #t)
+                (axis? #t))
 
-    (super-new (parent            parent)
-               (style     '(transparent))
-               (min-width             50)
-               (min-height            50))
+    (super-new (parent     parent)
+               (style      (if background null '(transparent)))
+               (min-width  50)
+               (min-height 50))
 
+    (when background
+      (send this set-canvas-background background))
 
     ;;;;;;;;;;;;;;;;
     ;; PLOT STATE ;;
@@ -48,6 +92,7 @@
     (send dc set-smoothing (if antialiasing? 'smoothed 'unsmoothed))
     (send dc set-font      font)
     (send dc set-brush     brush)
+    (send dc set-text-foreground text)
 
     (define width   (send this get-width))
     (define height  (send this get-height))
@@ -56,7 +101,7 @@
     (define x-proj  (/ width x-span))
     (define y-proj  (/ height (- y-span)))
     (define step    (/ x-span samples))
-    (define xs      (range x-min x-max step))
+    (define xs      (range x-min (+ x-max step) step))
     (define x-ticks (make-ticks x-min x-max))
     (define y-ticks (make-ticks y-min y-max))
 
@@ -78,7 +123,7 @@
         (set! x-span  (- x-max* x-min*))
         (set! step    (/ x-span samples))
         (set! x-proj  (/ width x-span))
-        (set! xs      (range x-min* x-max* step))
+        (set! xs      (range x-min* (+ x-max* step) step))
         (set! x-ticks (make-ticks x-min* x-max*)))
       (unless (= x-min x-min*)
         (set! x-min x-min*))
@@ -115,6 +160,33 @@
     ;; PLOT METHODS ;;
     ;;;;;;;;;;;;;;;;;;
 
+    (define/public (get-grid)
+      grid?)
+
+    (define/public (set-grid! grid?*)
+      (unless (or (eq? grid? grid?*)
+                  (not (boolean? grid?*)))
+        (set! grid? grid?*)
+        (send this refresh)))
+
+    (define/public (get-axis)
+      axis?)
+
+    (define/public (set-axis! axis?*)
+      (unless (or (eq? axis? axis?*)
+                  (not (boolean? axis?*)))
+        (set! axis? axis?*)
+        (send this refresh)))
+
+    (define/public (get-ticks)
+      ticks?)
+
+    (define/public (set-ticks! ticks?*)
+      (unless (or (eq? ticks? ticks?*)
+                  (not (boolean? ticks?*)))
+        (set! ticks? ticks?*)
+        (send this refresh)))
+    
     (define/public (get-samples)
       samples)
 
@@ -122,7 +194,7 @@
       (unless (or (= samples samples*)
                   (not (exact-positive-integer? samples*)))
         (set! step    (/ x-span samples*))
-        (set! xs      (range x-min x-max step))
+        (set! xs      (range x-min (+ x-max step) step))
         (set! samples samples*)
         (send this refresh)))
 
@@ -136,14 +208,25 @@
         (send dc set-smoothing (if antialiasing? 'smoothed 'unsmoothed))
         (send this refresh)))
 
-    (define/public (get-source-data)
-      source-data)
+    (define/public (get-source-points)
+      source-points)
 
-    (define/public (set-source-data! source-data*)
-      (unless (or (eq? source-data source-data*)
-                  (and (not (procedure? source-data*))
-                       (not (pair? source-data*))))
-        (set! source-data source-data*)
+    (define/public (set-source-points! source-points*)
+      (unless (or (eq? source-points source-points*)
+                  (and (not (vector? source-points*))
+                       (not (pair? source-points*))
+                       (not (boolean? source-points*))))
+        (set! source-points source-points*)
+        (send this refresh)))
+
+    (define/public (get-source-function)
+      source-function)
+
+    (define/public (set-source-function! source-function*)
+      (unless (or (eq? source-function source-function*)
+                  (and (not (procedure? source-function*))
+                       (not (boolean? source-function*))))
+        (set! source-function source-function*)
         (send this refresh)))
 
     ;;;;;;;;;;;;;;;;;;;;
@@ -165,8 +248,13 @@
                          ((send e get-control-down) (zoom-view! +0.00 -0.05))
                          (else                      (zoom-view! -0.05 -0.05))))
         ;; sampling control
-        ((#\] #\} #\a) (set-samples! (if (<= samples 2) samples (- samples 1))))
-        ((#\[ #\{ #\s) (set-samples! (+ samples 1)))))
+        ((#\[ #\{) (set-samples! (if (<= samples 2) samples (- samples 1))))
+        ((#\] #\}) (set-samples! (+ samples 1)))
+        ;; features control
+        ((#\a) (set-antialiasing! (not antialiasing?)))
+        ((#\t) (set-ticks! (not ticks?)))
+        ((#\g) (set-grid! (not grid?)))
+        ((#\l) (set-axis! (not axis?)))))
 
     (define/override (on-event e)
       (cond ((send e dragging?)
@@ -186,68 +274,70 @@
       ;; paint axis
       (send dc set-pen line-pen)
       (when (<= x-min 0 x-max)
-        (send dc draw-line
-              (* x-proj (- x-min))
-              (* y-proj (- y-min y-max))
-              (* x-proj (- x-min))
-              0)
-        (unless (< height 150)
+        (unless (not axis?)
+         (send dc draw-line
+               (* x-proj (- x-min))
+               (* y-proj (- y-min y-max))
+               (* x-proj (- x-min))
+               0))
+        (unless (or (< height 150) (not ticks?))
           (for-each (lambda (t)
                       (send dc draw-text (second t)
                             (* x-proj (- x-min))
                             (* y-proj (- (first t) y-max))))
                     y-ticks)))
       (when (<= y-min 0 y-max)
-        (send dc draw-line
-              0
-              (* y-proj (- y-max))
-              (* x-proj (- x-max x-min))
-              (* y-proj (- y-max)))
-        (unless (< width 150)
+        (unless (not axis?)
+          (send dc draw-line
+                0
+                (* y-proj (- y-max))
+                (* x-proj (- x-max x-min))
+                (* y-proj (- y-max))))
+        (unless (or (< width 150) (not ticks?))
          (for-each (lambda (t)
                      (send dc draw-text (second t)
                            (* x-proj (- (first t) x-min))
                            (* y-proj (- y-max))))
                    x-ticks)))
-      (send dc set-pen grid-pen)
-      (for-each (lambda (t)
-                  (when (third t)
-                    (send dc draw-line
-                          0
-                          (* y-proj (- (first t) y-max))
-                          (* x-proj x-span)
-                          (* y-proj (- (first t) y-max)))))
-                y-ticks)
+      (when grid?
+        (send dc set-pen grid-pen)
+        (for-each (lambda (t)
+                    (when (third t)
+                      (send dc draw-line
+                            0
+                            (* y-proj (- (first t) y-max))
+                            (* x-proj x-span)
+                            (* y-proj (- (first t) y-max)))))
+                  y-ticks)
 
-      (for-each (lambda (t)
-                  (when (third t)
-                    (send dc draw-line
-                          (* x-proj (- (first t) x-min))
-                          (* y-proj (- y-span))
-                          (* x-proj (- (first t) x-min))
-                          0)))
-                x-ticks)
+        (for-each (lambda (t)
+                    (when (third t)
+                      (send dc draw-line
+                            (* x-proj (- (first t) x-min))
+                            (* y-proj (- y-span))
+                            (* x-proj (- (first t) x-min))
+                            0)))
+                  x-ticks))
 
       ;; paint data
-      (cond ((procedure? source-data)
-             (define path (new dc-path%))
-             (send dc set-pen line-pen)
-             (send path move-to
-                   0
-                   (* y-proj (- (source-data x-min) y-max)))
-             (for-each (lambda (x)
-                         (send path line-to
-                               (* x-proj (- x x-min))
-                               (* y-proj (- (source-data x) y-max))))
-                       xs)
-             (send dc draw-path path))
-            ((pair? source-data)
-             (send dc set-pen dot-pen)
-             (for-each (lambda (point)
-                         (send dc draw-point
-                               (* x-proj (- (car point) x-min))
-                               (* y-proj (- (cdr point) y-max))))
-                       source-data))))
+      (when source-function
+        (define path (new dc-path%))
+        (send dc set-pen line-pen)
+        (send path move-to
+              0
+              (* y-proj (- (source-function x-min) y-max)))
+        (for ((x xs))
+          (send path line-to
+                (* x-proj (- x x-min))
+                (* y-proj (- (source-function x) y-max))))
+        (send dc draw-path path))
+
+      (when source-points
+        (send dc set-pen dot-pen)
+        (for ((point source-points))
+          (send dc draw-point
+                (* x-proj (- (car point) x-min))
+                (* y-proj (- (cdr point) y-max))))))
 
     ;; refresh state
     (define/override (on-size new-width new-height)
@@ -274,14 +364,10 @@
     (build-list 20 (lambda (i)
                      (let ((z (/ (- i 10.0) 2.0)))
                        (cons z (logistic z))))))
-  (define funct-plot (new simplot%
-                          [parent panel]
-                          [source-data logistic]
-                          [x-min -6.0] [x-max +6.0]
-                          [y-min -0.2] [y-max +1.2]))
-  (define point-plot (new simplot%
-                          [parent panel]
-                          [source-data points]
-                          [x-min -6.0] [x-max +6.0]
-                          [y-min -0.2] [y-max +1.2]))
+  (define p (new simplot%
+                 (parent panel)
+                 (source-function logistic)
+                 (source-points points)
+                 [x-min -6.0] [x-max +6.0]
+                 [y-min -0.2] [y-max +1.2]))
   (send frame show #t))
