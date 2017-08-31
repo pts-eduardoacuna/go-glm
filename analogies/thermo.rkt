@@ -116,7 +116,10 @@
 
       ;; draw face
       (send dc set-brush face-brush)
-      (define val-coef (/ (- value min-value) (- max-value min-value)))
+      (define cap-value (cond ((< value min-value) min-value)
+                              ((> value max-value) max-value)
+                              (else value)))
+      (define val-coef (/ (- cap-value min-value) (- max-value min-value)))
       (define face-x (* (- width height) val-coef))
       (define face-y 0)
       (send dc draw-ellipse

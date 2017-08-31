@@ -21,6 +21,7 @@
 (define font       (make-object font% 8 'modern))
 (define brush      (new brush% (style 'transparent)))
 (define line-pen   (new pen% (width 1)))
+(define expect-pen (new pen% (width 1) (style 'dot-dash)))
 (define grid-pen   (new pen% (width 0) (style 'dot) (color dimmed-grey)))
 (define dot-pen    (new pen% (width 5)))
 (define background #f)
@@ -30,6 +31,7 @@
   (set! background #f)
   (set! text       black)
   (set! line-pen   (new pen% (width 1) (style 'solid) (color black)))
+  (set! expect-pen (new pen% (width 1) (style 'dot-dash) (color black)))
   (set! grid-pen   (new pen% (width 0) (style 'dot)   (color dimmed-grey)))
   (set! dot-pen    (new pen% (width 5) (style 'solid) (color black))))
 
@@ -37,6 +39,7 @@
   (set! background black)
   (set! text       green)
   (set! line-pen   (new pen% (width 1) (style 'solid) (color green)))
+  (set! expect-pen (new pen% (width 1) (style 'dot-dash) (color green)))
   (set! grid-pen   (new pen% (width 0) (style 'dot)   (color dimmed-green)))
   (set! dot-pen    (new pen% (width 5) (style 'solid) (color green))))
 
@@ -44,6 +47,7 @@
   (set! background papaya)
   (set! text       crimson)
   (set! line-pen   (new pen% (width 1) (style 'solid) (color sea-green)))
+  (set! expect-pen (new pen% (width 1) (style 'dot-dash) (color sea-green)))
   (set! grid-pen   (new pen% (width 0) (style 'dot)   (color peach-puff)))
   (set! dot-pen    (new pen% (width 5) (style 'solid) (color steele-blue))))
 
@@ -66,6 +70,7 @@
     (init-field parent
                 (source-points   #f)
                 (source-function #f)
+                (expected-function #f)
                 (x-min -1)
                 (x-max +1)
                 (y-min -1)
@@ -229,6 +234,16 @@
         (set! source-function source-function*)
         (send this refresh)))
 
+    (define/public (get-expected-function)
+      expected-function)
+
+    (define/public (set-expected-function! expected-function*)
+      (unless (or (eq? expected-function expected-function*)
+                  (and (not (procedure? expected-function*))
+                       (not (boolean? expected-function*))))
+        (set! expected-function expected-function*)
+        (send this refresh)))
+
     ;;;;;;;;;;;;;;;;;;;;
     ;; CANVAS METHODS ;;
     ;;;;;;;;;;;;;;;;;;;;
@@ -320,6 +335,19 @@
                   x-ticks))
 
       ;; paint data
+      (when expected-function
+        (define path (new dc-path%))
+        (send dc set-pen expect-pen)
+        (send path move-to
+              0
+              (* y-proj (- (expected-function x-min) y-max)))
+        (for ((x xs))
+          (send path line-to
+                (* x-proj (- x x-min))
+                (* y-proj (- (expected-function x) y-max))))
+        (send dc draw-path path))
+
+      
       (when source-function
         (define path (new dc-path%))
         (send dc set-pen line-pen)

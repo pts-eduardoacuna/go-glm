@@ -32,6 +32,8 @@
 (define lgh-background-main (scale-color 2.0 background-main))
 (define lgh-background-secn (scale-color 2.0 background-secn))
 
+(define font (make-object font% 12 'modern 'normal 'bold))
+
 (define (apply-derived-colors!)
   (set! drk-border-color    (scale-color 0.9 border-color))
   (set! drk-background-main (scale-color 0.9 background-main))
@@ -84,6 +86,7 @@
     
     ;; set up DC
     (send dc set-smoothing 'smoothed)
+    (send dc set-font font)
 
     ;; compute the pict of the potentiometer
     (define (get-pict clicked? hover? angle)
@@ -155,12 +158,13 @@
 (define poten%
   (class vertical-panel%
     (init-field parent label notify-change initial-value)
-    (super-new (parent parent))
+    (super-new (parent parent)
+               (min-width 100))
 
     (define (angle-changed theta)
       (define x (angle->value theta))
       (unless (= x value)
-        (set-value x)))
+        (set-value! x)))
 
     (define name-message (new message%
                               (parent this)
@@ -171,17 +175,19 @@
                         (notify-change angle-changed)))
     (define value-message (new message%
                                (parent this)
-                               (label (real->decimal-string initial-value))
+                               (font font)
+                               (label (string-append (if (not (negative? initial-value)) "+" "") (real->decimal-string initial-value)))
                                (auto-resize #t)))
 
     (define value initial-value)
 
-    (define/public (get-state) value)
+    (define/public (get-value) value)
 
-    (define/public (set-value x)
+    (define/public (set-value! x)
       (set! value x)
-      (send value-message set-label (real->decimal-string x))
+      (send value-message set-label (string-append (if (not (negative? x)) "+" "") (real->decimal-string x)))
       (send canvas set-angle (value->angle x))
+      (send canvas refresh)
       (notify-change x))))
 
 (define (value->angle x)
