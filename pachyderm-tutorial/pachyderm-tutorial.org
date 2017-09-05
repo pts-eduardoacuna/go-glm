@@ -1,0 +1,141 @@
+#+TITLE Pachyderm tutorial
+
+8:20
+
+* Pachyderm setup 
+** Clean minikube
+   #+BEGIN_SRC sh
+     minikube delete
+   #+END_SRC
+
+** Start minikube
+   #+BEGIN_SRC sh
+     minikube start
+   #+END_SRC
+   
+   #+BEGIN_SRC sh
+     minikube status
+   #+END_SRC
+   
+** Deploy pachyderm locally
+   #+BEGIN_SRC sh
+     pachctl deploy local
+   #+END_SRC
+
+   #+BEGIN_SRC sh
+     watch -n 1 'kubectl get all | head'
+   #+END_SRC
+   
+   #+BEGIN_SRC sh :session port-forwarding
+     pachctl port-forward
+   #+END_SRC
+   
+   #+BEGIN_SRC sh
+     pachctl version
+   #+END_SRC
+
+* Example
+** Create a repo
+   #+BEGIN_SRC sh
+     pachctl create-repo images
+   #+END_SRC
+   
+   #+BEGIN_SRC sh
+     pachctl list-repo
+   #+END_SRC
+
+** Add an image
+   #+BEGIN_SRC sh
+     pachctl put-file images master liberty.png -c -f http://imgur.com/46Q8nDz.png
+   #+END_SRC
+   
+   #+BEGIN_SRC sh
+     pachctl list-repo
+   #+END_SRC
+   
+   #+BEGIN_SRC sh
+     pachctl list-commit images
+   #+END_SRC
+   
+   #+BEGIN_SRC sh
+     pachctl list-file images master
+   #+END_SRC
+   
+   #+BEGIN_SRC sh :results file
+     pachctl get-file images master liberty.png > images/liberty.png
+     echo "images/liberty.png"
+   #+END_SRC
+
+** Create a Pipeline
+   #+BEGIN_SRC json :tangle edges.json
+    {
+      "pipeline": {
+        "name": "edges"
+      },
+      "transform": {
+        "cmd": [ "python3", "/edges.py" ],
+        "image": "eduardoacye/opencv"
+      },
+      "input": {
+        "atom": {
+          "repo": "images",
+          "glob": "/*"
+        }
+      }
+    }
+   #+END_SRC
+   
+   #+BEGIN_SRC python :tangle edges.py
+    import cv2
+    import numpy as np
+    from matplotlib import pyplot as plt
+    import os
+
+    def make_edges(image):
+        img = cv2.imread(image)
+        tail = os.path.split(image)[1]
+        edges = cv2.Canny(img,100,200)
+        plt.imsave(os.path.join("/pfs/out", os.path.splitext(tail)[0]+'.png'), edges, cmap = 'gray')
+
+    for dirpath, dirs, files in os.walk("/pfs/images"):
+        for file in files:
+            make_edges(os.path.join(dirpath, file))
+   #+END_SRC
+   
+   #+BEGIN_SRC sh
+    pachctl create-pipeline -f edges.json
+   #+END_SRC
+   
+   #+BEGIN_SRC sh
+    pachctl list-job
+   #+END_SRC
+
+   #+BEGIN_SRC sh
+    pachctl list-repo
+   #+END_SRC
+   
+   #+BEGIN_SRC sh :results file
+    pachctl get-file edges master liberty.png > edges/liberty.png
+    echo "edges/liberty.png"
+    # pachctl get-file edges master liberty.png | open -f -a /Applications/Preview.app
+   #+END_SRC
+   
+** Processing More Data
+   #+BEGIN_SRC sh
+     pachctl put-file images master AT-AT.png -c -f http://imgur.com/8MN9Kg0.png
+     pachctl put-file images master kitten.png -c -f http://imgur.com/g2QnNqa.png
+   #+END_SRC
+
+   #+BEGIN_SRC sh
+     pachctl list-job
+   #+END_SRC
+
+   #+BEGIN_SRC sh :results file
+    pachctl get-file edges master AT-AT.png > edges/AT-AT.png
+    echo "edges/AT-AT.png"
+   #+END_SRC
+   
+   #+BEGIN_SRC sh :results file
+    pachctl get-file edges master kitten.png > edges/kitten.png
+    echo "edges/kitten.png"
+   #+END_SRC
