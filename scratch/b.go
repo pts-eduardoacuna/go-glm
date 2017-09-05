@@ -1,10 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 )
@@ -164,7 +162,7 @@ func main() {
 	fmt.Println(labelReader.LabelCount)
 
 	// Plot some images
-	for i := uint32(0); i < imageReader.ImageCount; i++ {
+	for i := uint32(0); i < imageReader.ImageCount/100; i++ {
 		img, err := imageReader.ReadImage()
 		if err != nil {
 			log.Fatal("Error reading MNIST image", err)
